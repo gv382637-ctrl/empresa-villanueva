@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Nómina Empresa Villanueva</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root { --blue: #1a73e8; --red: #d93025; --gray: #f8f9fa; }
+        body { font-family: 'Segoe UI', sans-serif; background: #eef2f7; padding: 20px; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .header-logo { text-align: center; margin-bottom: 20px; }
+        h1 { color: var(--blue); margin: 5px 0; font-size: 28px; text-transform: uppercase; }
+        .grid-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; border-top: 2px solid #eee; padding-top: 20px; }
+        .input-box { display: flex; flex-direction: column; margin-top: 10px; }
+        label { font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #444; }
+        input { padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; }
+        .desglose-lista { background: var(--gray); padding: 20px; border-radius: 10px; margin-top: 20px; display: none; border-left: 5px solid var(--blue); }
+        .item-lista { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #ddd; }
+        .total { font-weight: bold; color: var(--blue); border-top: 2px solid var(--blue); margin-top: 10px; font-size: 20px; }
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; }
+        button { flex: 1; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.3s; }
+        .btn-calc { background: var(--blue); color: white; }
+        .btn-pdf { background: var(--red); color: white; }
+        button:hover { opacity: 0.8; transform: translateY(-1px); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-logo">
+        <h1 id="tituloEmpresa">EMPRESA VILLANUEVA</h1>
+        <p style="color: #666;">Control de Nómina Semanal</p>
+    </div>
+    
+    <div class="grid-inputs">
+        <div class="input-box"><label>No. de Operador</label><input type="text" id="operador" placeholder="Ej. 587"></div>
+        <div class="input-box"><label>Nombre del Empleado</label><input type="text" id="nombre" placeholder="Ej. GUSTAVO"></div>
+        <div class="input-box"><label>Sueldo Diario ($)</label><input type="number" id="sd" step="0.01" placeholder="555.00"></div>
+        <div class="input-box"><label>Días Laborados</label><input type="number" id="dias" step="1" value="7"></div>
+    </div>
+
+    <div class="btn-group">
+        <button class="btn-calc" onclick="calcular()">CALCULAR DESGLOSE</button>
+        <button class="btn-pdf" onclick="generarPDF()">DESCARGAR RECIBO PDF</button>
+    </div>
+
+    <div id="desglose" class="desglose-lista">
+        <h3 style="margin:0 0 10px 0;">Detalle del Pago</h3>
+        <div class="item-lista"><span>Sueldo Base:</span> <span id="l-sueldo"></span></div>
+        <div class="item-lista"><span>Séptimo Día:</span> <span id="l-septimo"></span></div>
+        <div class="item-lista"><span>Base Gravable:</span> <span id="l-base"></span></div>
+        <div class="item-lista" style="color:var(--red)"><span>Deducción ISR:</span> <span id="l-isr"></span></div>
+        <div class="item-lista" style="color:var(--red)"><span>Deducción IMSS:</span> <span id="l-imss"></span></div>
+        <div class="item-lista total"><span>NETO A PAGAR:</span> <span id="l-neto"></span></div>
+    </div>
+</div>
+
+<script>
+let dataPDF = {};
+
+function calcular() {
+    const sd = parseFloat(document.getElementById('sd').value);
+    const dias = parseFloat(document.getElementById('dias').value);
+    
+    if(!sd || !dias) return alert("Por favor completa los datos");
+
+    const sueldoBase = sd * dias;
+    const septimo = (sd / 6) * dias; 
+    const base = sueldoBase + septimo;
+
+    // Lógica ISR Semanal 2026 (Simulada)
+    let limInf = 0, cuota = 0, tasa = 0;
+    if (base <= 4035.92) { tasa = 0.1792; limInf = 3371.42; cuota = 308.35; } 
+    else if (base <= 8139.74) { limInf = 4035.93; cuota = 427.56; tasa = 0.2136; }
+    else { limInf = 8139.75; cuota = 1304.14; tasa = 0.2352; }
+
+    const isrCausado = ((base - limInf) * tasa) + cuota;
+    const subsidio = (base <= 2111.90) ? 123.46 : 0; 
+    const isrFinal = Math.max(0, isrCausado - subsidio);
+    const imss = base * 0.02775; 
+    const neto = base - isrFinal - imss;
+
+    document.getElementById('l-sueldo').innerText = `$${sueldoBase.toFixed(2)}`;
+    document.getElementById('l-septimo').innerText = `$${septimo.toFixed(2)}`;
+    document.getElementById('l-base').innerText = `$${base.toFixed(2)}`;
+    document.getElementById('l-isr').innerText = `$${isrFinal.toFixed(2)}`;
+    document.getElementById('l-imss').innerText = `$${imss.toFixed(2)}`;
+    document.getElementById('l-neto').innerText = `$${neto.toFixed(2)}`;
+    document.getElementById('desglose').style.display = 'block';
+
+    dataPDF = {
+        op: document.getElementById('operador').value,
+        nombre: document.getElementById('nombre').value,
+        sd, dias, septimo, base, isr: isrFinal, imss, neto
+    };
+}
+
+function generarPDF() {
+    if(!dataPDF.nombre) return alert("Primero haz clic en CALCULAR");
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Título Principal - EMPRESA VILLANUEVA
+    doc.setFontSize(22);
+    doc.setTextColor(26, 115, 232);
+    doc.setFont("helvetica", "bold");
+    doc.text("EMPRESA VILLANUEVA", 105, 25, {align: "center"});
+    
+    // Información General
+    doc.setFontSize(11);
+    doc.setTextColor(0);
+    doc.setFont("helvetica", "normal");
+    doc.text(`OPERADOR: ${dataPDF.op}`, 20, 50);
+    doc.text(`TRABAJADOR: ${dataPDF.nombre}`, 20, 57);
+    doc.text(`FECHA: ${new Date().toLocaleDateString()}`, 140, 50);
+
+    // Tabla de Desglose
+    doc.autoTable({
+        startY: 65,
+        head: [['CONCEPTO', 'CANTIDAD / MONTO']],
+        body: [
+            ['Sueldo Diario', `$${dataPDF.sd.toFixed(2)}`],
+            ['Días Laborados', dataPDF.dias],
+            ['Séptimo Día Proporcional', `$${dataPDF.septimo.toFixed(2)}`],
+            ['Total Percepciones (Base)', `$${dataPDF.base.toFixed(2)}`],
+            ['Deducción: ISR', `$${dataPDF.isr.toFixed(2)}`],
+            ['Deducción: IMSS', `$${dataPDF.imss.toFixed(2)}`],
+            [{content: 'TOTAL NETO PAGADO', styles: {fillColor: [26, 115, 232], textColor: 255, fontStyle: 'bold'}}, 
+             `$${dataPDF.neto.toFixed(2)}`]
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [0, 191, 165] }
+    });
+
+    // Firma
+    const finalY = doc.lastAutoTable.finalY + 30;
+    doc.setDrawColor(0);
+    doc.line(70, finalY, 140, finalY);
+    doc.text("FIRMA DE CONFORMIDAD", 105, finalY + 5, {align: "center"});
+
+    doc.save(`Nomina_Villanueva_${dataPDF.nombre}.pdf`);
+}
+</script>
+</body>
+</html>
